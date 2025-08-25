@@ -3,6 +3,8 @@ local require = require("noice.util.lazy")
 local Config = require("noice.config")
 local Format = require("noice.text.format")
 local Manager = require("noice.message.manager")
+local Util = require("noice.util")
+local View = require("noice.view")
 local builtin = require("fzf-lua.previewer.builtin")
 local fzf = require("fzf-lua")
 
@@ -82,6 +84,29 @@ function M.previewer(messages)
   return previewer
 end
 
+local function open_with(line, messages, is_popup, split_or_vsplit)
+  is_popup = is_popup or false
+  split_or_vsplit = split_or_vsplit or "split"
+
+  local id = tonumber(line:match("^%d+"))
+  local entry = messages[id]
+
+  if is_popup then
+    local view = View.get_view("popup", {})
+    view:set(entry.message)
+    view:display()
+    return
+  end
+
+  local buf = vim.api.nvim_create_buf(false, true)
+
+  local m = Format.format(entry.message, "fzf_preview")
+  m:render(buf, Config.ns)
+
+  vim.cmd(split_or_vsplit)
+  vim.api.nvim_win_set_buf(0, buf)
+end
+
 ---@param opts? table<string, any>
 function M.open(opts)
   local messages = M.find()
@@ -101,7 +126,36 @@ function M.open(opts)
       ["--with-nth"] = "2..",
     },
     actions = {
-      default = function() end,
+      ["default"] = function(selected, _)
+        if not selected then
+          return
+        end
+        if #selected > 1 then
+          Util.error("Not implemented yet")
+          return
+        end
+        open_with(selected[1], messages, true)
+      end,
+      ["ctrl-v"] = function(selected, _)
+        if not selected then
+          return
+        end
+        if #selected > 1 then
+          Util.error("Not implemented yet")
+          return
+        end
+        open_with(selected[1], messages, false, "vsplit")
+      end,
+      ["ctrl-s"] = function(selected, _)
+        if not selected then
+          return
+        end
+        if #selected > 1 then
+          Util.error("Not implemented yet")
+          return
+        end
+        open_with(selected[1], messages, false, "split")
+      end,
     },
   })
   local lines = vim.tbl_map(function(entry)
